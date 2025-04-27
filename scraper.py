@@ -1,6 +1,15 @@
 import re
 from urllib.parse import urlparse
 
+VALID_DOMAINS = [
+    "ics.uci.edu",
+    "cs.uci.edu",
+    "informatics.uci.edu",
+    "stat.uci.edu",
+]
+VALID_PATH = "today.uci.edu/department/information_computer_sciences/"
+
+
 def scraper(url, resp):
     links = extract_next_links(url, resp)
     return [link for link in links if is_valid(link)]
@@ -25,6 +34,12 @@ def is_valid(url):
         parsed = urlparse(url)
         if parsed.scheme not in set(["http", "https"]):
             return False
+
+        # Must be in allowed domains or specific path
+        netloc_plus_path = parsed.netloc + parsed.path
+        if not (any(domain in parsed.netloc for domain in VALID_DOMAINS) or VALID_PATH in netloc_plus_path):
+            return False
+
         return not re.match(
             r".*\.(css|js|bmp|gif|jpe?g|ico"
             + r"|png|tiff?|mid|mp2|mp3|mp4"
