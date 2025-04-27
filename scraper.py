@@ -1,5 +1,7 @@
 import re
-from urllib.parse import urlparse
+from urllib.parse import urlparse, urljoin, urldefrag
+from bs4 import BeautifulSoup
+
 
 VALID_DOMAINS = [
     "ics.uci.edu",
@@ -24,7 +26,27 @@ def extract_next_links(url, resp):
     #         resp.raw_response.url: the url, again
     #         resp.raw_response.content: the content of the page!
     # Return a list with the hyperlinks (as strings) scrapped from resp.raw_response.content
-    return list()
+
+    output_links = []
+    
+    if resp.status != 200:
+        # return if the page did not load properly
+        return output_links
+    
+    try:
+        soup = BeautifulSoup(resp.raw_response.content, "html.parser")
+        for link_tag in soup.find_all("a"):
+            href = link_tag.get("href")
+            if href:
+                # Make absolute URL based on base `url`
+                absolute_url = urljoin(url, href)
+                # Remove fragments
+                absolute_url, _ = urldefrag(absolute_url)
+                output_links.append(absolute_url)
+    except Exception as e:
+        print(f"Error while parsing {url}: {e}")
+
+    return output_links
 
 def is_valid(url):
     # Decide whether to crawl this url or not. 
