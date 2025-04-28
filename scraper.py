@@ -1,7 +1,19 @@
 import re
 from urllib.parse import urlparse, urljoin, urldefrag
 from bs4 import BeautifulSoup
+import hashlib
+from collections import Counter
+from urllib.parse import urlunparse
 
+# 1 MBs
+MAX_PAGE_BYTES = 1_048_576
+CRAWLED_LINKS: set[str] = set()
+LONGEST_DOC: tuple[str, int] = ("", 0)
+WORD_COUNTS: Counter = Counter()
+SEEN_HASH: set[str] = set()
+_WORD_RE = re.compile(r"\b\w+\b")
+
+BLOCK_CAL = re.compile(r'/calendar/|/events/|\d{4}/\d{2}/\d{2}|tribe-bar-date=\d{4}-\d{2}-\d{2}')
 
 VALID_DOMAINS = [
     "ics.uci.edu",
@@ -11,10 +23,78 @@ VALID_DOMAINS = [
 ]
 VALID_PATH = "today.uci.edu/department/information_computer_sciences/"
 
+# Commonly used words lacking in semantic value and filtered out of
+STOP_WORDS = {
+    "about", "above", "after", "again", "against", "all", "also", "am", "an",
+    "and", "any", "are", "around", "as", "at",
+    "be", "because", "been", "before", "being", "below", "between", "both",
+    "but", "by",
+    "can", "cannot", "could",
+    "did", "do", "does", "doing", "down", "during",
+    "each",
+    "few", "for", "from", "further",
+    "had", "has", "have", "having", "he", "her", "here", "hers", "him",
+    "his", "how",
+    "if", "in", "into", "is", "it", "its",
+    "just",
+    "may", "might", "more", "most", "must", "my",
+    "no", "nor", "not", "now",
+    "of", "off", "on", "once", "only", "or", "other", "our", "out", "over",
+    "own",
+    "same", "she", "should", "so", "some", "such",
+    "than", "that", "the", "their", "them", "then", "there", "these", "they",
+    "this", "those", "through", "to", "too",
+    "under", "until", "up",
+    "very",
+    "was", "we", "were", "what", "when", "where", "which", "while", "who",
+    "whom", "why", "with", "would",
+    "you", "your"
+}
+
+def pull_text_content(resp) -> str:
+    """Return visible text from HTML page"""
+    if resp.status != 200 or resp.raw_response is None:
+        return ""
+
+    ctype = resp.raw_response.headers.get("Content-Type", "").lower()
+    if "text/html" not in ctype:
+        return ""
+
+    try:
+        if int(resp.raw_response.headers.get("Content-Length", 0)) > MAX_PAGE_BYTES:
+            return ""
+    except ValueError:
+        pass
+
+    soup = BeautifulSoup(resp.raw_response.content, "html.parser")
+    for tag in soup(["script", "style", "img", "nav"]):
+        tag.decompose()
+
+    return soup.get_text(" ", strip=True)
+
+def break_into_words(text: str) -> list[str]:
+    """Tokenise into lowercase nums/letters."""
+    return _WORD_RE.findall(text.lower())
+
+def accumulate_tokens(toks: list[str]) -> None:
+    """Update WORD_COUNTS, not including single char tokens and stop words."""
+    WORD_COUNTS.update(
+        t for t in toks
+        if len(t) > 1 and t not in STOP_WORDS
+    )
+
+def hash_text(text: str) -> str:
+    """Secure Hash Algorithm, digest size of 256 bits."""
+    return hashlib.sha256(text.encode("utf-8")).hexdigest()
 
 def scraper(url, resp):
-    links = extract_next_links(url, resp)
-    return [link for link in links if is_valid(link)]
+    text_content = pull_text_content(resp)
+    words = break_into_words(text_content)
+    content_hash = hash_text(text_content)
+    accumulate_tokens(words)
+
+    for link in valid_links:
+        CRAWLED_LINKS.add(link)
 
 def extract_next_links(url, resp):
     # Implementation required.
@@ -75,3 +155,4 @@ def is_valid(url):
     except TypeError:
         print ("TypeError for ", parsed)
         raise
+
