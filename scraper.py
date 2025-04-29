@@ -62,6 +62,27 @@ def is_valid(url):
         if not (any(domain in parsed.netloc for domain in VALID_DOMAINS) or VALID_PATH in netloc_plus_path):
             return False
 
+        fullURL = parsed.netloc + parsed.path + parsed.params + parsed.query + parsed.fragment
+        # Avoid calendar dates mm-dd-yyyy
+        match = re.search(r'\b\d{2}-\d{2}-\d{4}\b', fullURL)
+        if match:
+            return False
+        
+        # Avoid calendar dates yyyy-mm
+        matchYearMonth = re.search(r'\d{4}\b-\b\d{2}', fullURL)
+        if matchYearMonth:
+            return False
+        
+        # filter out yyyy-mm-dd + blacklist WICS event pages and dead/useless pages
+        matchYearMonthDayFormat = re.search(r'\d{4}\b-\b\d{2}-\d{2}', fullURL)
+        if matchYearMonthDayFormat:
+            return False
+
+        blacklist = ["wics.ics.uci.edu/event", "wics.ics.uci.edu/events", "wiki.ics.uci.edu/doku.php"]
+        for badLink in blacklist:
+            if badLink in fullURL:
+                return False
+        
         return not re.match(
             r".*\.(css|js|bmp|gif|jpe?g|ico"
             + r"|png|tiff?|mid|mp2|mp3|mp4"
