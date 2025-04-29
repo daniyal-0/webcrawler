@@ -5,11 +5,12 @@ import hashlib
 from collections import Counter
 from urllib.parse import urlunparse
 
-# 1 MBs
+# 1 MB
 MAX_PAGE_BYTES = 1_048_576
 CRAWLED_LINKS: set[str] = set()
 LONGEST_DOC: tuple[str, int] = ("", 0)
 WORD_COUNTS: Counter = Counter()
+MIN_WORD_COUNT = 25
 SEEN_HASH: set[str] = set()
 _WORD_RE = re.compile(r"\b\w+\b")
 
@@ -23,7 +24,7 @@ VALID_DOMAINS = [
 ]
 VALID_PATH = "today.uci.edu/department/information_computer_sciences/"
 
-# Commonly used words lacking in semantic value and filtered out of
+# Commonly used words lacking in semantic value and filtered out of analysis
 STOP_WORDS = {
     "about", "above", "after", "again", "against", "all", "also", "am", "an",
     "and", "any", "are", "around", "as", "at",
@@ -76,6 +77,13 @@ def break_into_words(text: str) -> list[str]:
     """Tokenise into lowercase nums/letters."""
     return _WORD_RE.findall(text.lower())
 
+def trim_slash(u: str) -> str:
+    """Remove all trailing slashes except lone slashes."""
+    p = urlparse(u)
+    path = p.path[:-1] if p.path.endswith("/") and len(p.path) > 1 else p.path
+    return urlunparse(p._replace(path=path))
+
+
 def accumulate_tokens(toks: list[str]) -> None:
     """Update WORD_COUNTS, not including single char tokens and stop words."""
     WORD_COUNTS.update(
@@ -87,14 +95,65 @@ def hash_text(text: str) -> str:
     """Secure Hash Algorithm, digest size of 256 bits."""
     return hashlib.sha256(text.encode("utf-8")).hexdigest()
 
+def count_subdomains() -> dict[str, int]:
+    """Tally by subdomains, returning {subdomain: count}."""
+    bucket: dict[str, int] = {}
+    for link in CRAWLED_LINKS:
+        host = urlparse(link).netloc
+        if host.endswith("uci.edu"):
+            bucket[host] = bucket.get(host, 0) + 1
+    return dict(sorted(bucket.items()))
+
+def top_tokens() -> dict[str, int]:
+    """Return 50 most common tokens, not including stop words"""
+    return dict(WORD_COUNTS.most_common(50))
+
+def generate_report() -> None:
+    """Called at the end of every scrape"""
+    with open("report.txt", "w", encoding="utf-8") as rpt:
+        rpt.write(f"1) Unique pages found: {len(CRAWLED_LINKS)}\n\n")
+        rpt.write(
+            f"2) Longest page: {LONGEST_DOC[0]} "
+            f"({LONGEST_DOC[1]} words)\n\n"
+        )
+        rpt.write(
+            "3) Top 50 tokens:\n" +
+            ", ".join(top_tokens().keys()) + "\n\n"
+        )
+        subdomains = count_subdomains()
+        rpt.write(f"4) Subdomains found, ({len(subdomains)} total):\n")
+        for sd, cnt in subdomains.items():
+            rpt.write(f"{sd}, {cnt}\n")
+
 def scraper(url, resp):
-    text_content = pull_text_content(resp)
-    words = break_into_words(text_content)
-    content_hash = hash_text(text_content)
+    global LONGEST_DOC
+
+    #Extract text
+    text   = pull_text_content(resp)
+    words  = break_into_words(text)
+    if len(words) < MIN_WORD_COUNT:
+        return []
+
+    #Check for duplicate content
+    digest = hash_text(text)
+    if digest in SEEN_HASH:
+        return []
+    SEEN_HASH.add(digest)
+
+    #Longest page
+    if len(words) > LONGEST_DOC[1]:
+        LONGEST_DOC = (url, len(words))
+
     accumulate_tokens(words)
 
-    for link in valid_links:
-        CRAWLED_LINKS.add(link)
+    #Visit links
+    raw_links   = extract_next_links(url, resp)
+    valid_links = [trim_slash(l) for l in raw_links if is_valid(l)]
+
+    CRAWLED_LINKS.update(valid_links)
+    generate_report()
+
+    return valid_links
 
 def extract_next_links(url, resp):
     # Implementation required.
@@ -136,6 +195,14 @@ def is_valid(url):
         parsed = urlparse(url)
         if parsed.scheme not in set(["http", "https"]):
             return False
+        
+        #no query strings
+        if parsed.query:
+            return False
+        
+        #no calendars or event urls
+        if BLOCK_CAL.search(parsed.path):
+            return False
 
         # Must be in allowed domains or specific path
         netloc_plus_path = parsed.netloc + parsed.path
@@ -155,4 +222,3 @@ def is_valid(url):
     except TypeError:
         print ("TypeError for ", parsed)
         raise
-
