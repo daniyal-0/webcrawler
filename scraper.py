@@ -78,7 +78,10 @@ def is_valid(url):
         if matchYearMonthDayFormat:
             return False
 
-        blacklist = ["wics.ics.uci.edu/event", "wics.ics.uci.edu/events", "wiki.ics.uci.edu/doku.php"]
+        blacklist = ["wics.ics.uci.edu/event", "wics.ics.uci.edu/events", "wiki.ics.uci.edu/doku.php",
+        "?ical=1", "action=download", "gitlab.ics.uci.edu", "code.ics.uci.edu",
+        "statistics-stage.ics.uci.edu", "cbcl.ics.uci.edu/doku.php", "grape.ics.uci.edu/wiki",
+        "?action=login", "?action=edit"]
         for badLink in blacklist:
             if badLink in fullURL:
                 return False
@@ -91,7 +94,7 @@ def is_valid(url):
             + r"|data|dat|exe|bz2|tar|msi|bin|7z|psd|dmg|iso"
             + r"|epub|dll|cnf|tgz|sha1"
             + r"|thmx|mso|arff|rtf|jar|csv"
-            + r"|rm|smil|wmv|swf|wma|zip|rar|gz)$", parsed.path.lower())
+            + r"|rm|smil|wmv|swf|wma|zip|rar|gz|md|m|mpg|can|cp|py|h|c|cpp|ppsx|smi|sdf|mol|psp|bib|grm|npy|pps|ps|php)$", parsed.path.lower())
 
     except TypeError:
         print ("TypeError for ", parsed)
