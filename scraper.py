@@ -1,6 +1,7 @@
 import re
 from urllib.parse import urlparse, urljoin, urldefrag
 from bs4 import BeautifulSoup
+import os
 
 
 VALID_DOMAINS = [
@@ -10,6 +11,8 @@ VALID_DOMAINS = [
     "stat.uci.edu",
 ]
 VALID_PATH = "today.uci.edu/department/information_computer_sciences/"
+
+PAGES_DIR = "pages"
 
 
 def scraper(url, resp):
@@ -26,6 +29,17 @@ def extract_next_links(url, resp):
     #         resp.raw_response.url: the url, again
     #         resp.raw_response.content: the content of the page!
     # Return a list with the hyperlinks (as strings) scrapped from resp.raw_response.content
+
+    if resp.status == 200:
+        os.makedirs(PAGES_DIR, exist_ok=True)
+
+        # build filename from url
+        p = urlparse(url)
+        fn = (p.netloc + p.path).replace("/", "_").strip("_") + ".html"
+
+        # write the HTML
+        with open(os.path.join(PAGES_DIR, fn), "wb") as f:
+            f.write(resp.raw_response.content)
 
     output_links = []
     
@@ -54,6 +68,11 @@ def is_valid(url):
     # There are already some conditions that return False.
     try:
         parsed = urlparse(url)
+
+        
+        if parsed.path.lower().endswith('/covid19/index.html'):
+            return False
+            
         if parsed.scheme not in set(["http", "https"]):
             return False
 
@@ -76,6 +95,7 @@ def is_valid(url):
         if re.search(r"\d{4}-\d{2}-\d{2}", fullURL):
             return False
 
+
         blacklist = ["wics.ics.uci.edu/event", "wics.ics.uci.edu/events", "wiki.ics.uci.edu/doku.php",
         "?ical=1", "action=download", "gitlab.ics.uci.edu", "code.ics.uci.edu",
         "statistics-stage.ics.uci.edu", "cbcl.ics.uci.edu/doku.php", "grape.ics.uci.edu/wiki",
@@ -83,6 +103,7 @@ def is_valid(url):
         for badLink in blacklist:
             if badLink in fullURL:
                 return False
+
         
         return not re.match(
             r".*\.(css|js|bmp|gif|jpe?g|ico"
