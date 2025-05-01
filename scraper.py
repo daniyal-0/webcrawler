@@ -59,29 +59,27 @@ def is_valid(url):
 
         # Must be in allowed domains or specific path
         netloc_plus_path = parsed.netloc + parsed.path
-        if not (any(domain in parsed.netloc for domain in VALID_DOMAINS) or VALID_PATH in netloc_plus_path):
+        if not (parsed.netloc == domain or parsed.netloc.endswith("." + domain)
+            for domain in VALID_DOMAINS):
             return False
 
-        fullURL = parsed.netloc + parsed.path + parsed.params + parsed.query + parsed.fragment
+        fullURL = url
         # Avoid calendar dates mm-dd-yyyy
-        match = re.search(r'\b\d{2}-\d{2}-\d{4}\b', fullURL)
-        if match:
+        if re.search(r"\d{2}-\d{2}-\d{4}", fullURL):
             return False
         
         # Avoid calendar dates yyyy-mm
-        matchYearMonth = re.search(r'\d{4}\b-\b\d{2}', fullURL)
-        if matchYearMonth:
+        if re.search(r"\d{4}-\d{2}(?!-\d{2})", fullURL):
             return False
         
         # filter out yyyy-mm-dd + blacklist WICS event pages and dead/useless pages
-        matchYearMonthDayFormat = re.search(r'\d{4}\b-\b\d{2}-\d{2}', fullURL)
-        if matchYearMonthDayFormat:
+        if re.search(r"\d{4}-\d{2}-\d{2}", fullURL):
             return False
 
         blacklist = ["wics.ics.uci.edu/event", "wics.ics.uci.edu/events", "wiki.ics.uci.edu/doku.php",
         "?ical=1", "action=download", "gitlab.ics.uci.edu", "code.ics.uci.edu",
         "statistics-stage.ics.uci.edu", "cbcl.ics.uci.edu/doku.php", "grape.ics.uci.edu/wiki",
-        "?action=login", "?action=edit"]
+        "?action=login", "?action=edit", "news.nacs.uci.edu", "http://www.ics.uci.edu/~eppstein/pix"]
         for badLink in blacklist:
             if badLink in fullURL:
                 return False
