@@ -46,7 +46,12 @@ def extract_next_links(url, resp):
     if resp.status != 200:
         # return if the page did not load properly
         return output_links
-    
+
+    # heuristic check to prevent conversion of pdf files into html files (it produced garbage data)    
+    sample = html_bytes[:200].lower()
+    if b'<html' not in sample and b'<!doctype' not in sample:
+        return []   
+        
     try:
         soup = BeautifulSoup(resp.raw_response.content, "html.parser")
         for link_tag in soup.find_all("a"):
@@ -69,6 +74,7 @@ def is_valid(url):
     try:
         parsed = urlparse(url)
 
+        # make sure to allow today.uci.edu, per assignment docs"
         if parsed.netloc == "today.uci.edu" and parsed.path.startswith("/department/information_computer_sciences/"):
             return True
 
@@ -104,7 +110,7 @@ def is_valid(url):
         blacklist = ["wics.ics.uci.edu/event", "wics.ics.uci.edu/events", "wiki.ics.uci.edu/doku.php",
         "ical=1", "action=download", "gitlab.ics.uci.edu", "code.ics.uci.edu",
         "statistics-stage.ics.uci.edu", "cbcl.ics.uci.edu/doku.php", "grape.ics.uci.edu/wiki",
-        "action=login", "?action=edit", "news.nacs.uci.edu", "http://www.ics.uci.edu/~eppstein/pix"]
+        "action=login", "?action=edit", "news.nacs.uci.edu", "http://www.ics.uci.edu/~eppstein/pix", 'ics.uci.edu/~cs224']
         for badLink in blacklist:
             if badLink in fullURL:
                 return False
