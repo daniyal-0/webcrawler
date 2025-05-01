@@ -1,7 +1,7 @@
 import re
 from urllib.parse import urlparse, urljoin, urldefrag
 from bs4 import BeautifulSoup
-
+import os
 
 VALID_DOMAINS = [
     "ics.uci.edu",
@@ -9,8 +9,8 @@ VALID_DOMAINS = [
     "informatics.uci.edu",
     "stat.uci.edu",
 ]
-VALID_PATH = "today.uci.edu/department/information_computer_sciences/"
 
+PAGES_DIR = "pages"
 
 def scraper(url, resp):
     links = extract_next_links(url, resp)
@@ -26,6 +26,17 @@ def extract_next_links(url, resp):
     #         resp.raw_response.url: the url, again
     #         resp.raw_response.content: the content of the page!
     # Return a list with the hyperlinks (as strings) scrapped from resp.raw_response.content
+
+    if resp.status == 200:
+        os.makedirs(PAGES_DIR, exist_ok=True)
+
+        p = urlparse(url)
+        fn = (p.netloc + p.path).replace("/", "_").strip("_") + ".html"
+
+        # write raw HTML
+        with open(os.path.join(PAGES_DIR, fn), "wb") as f:
+            f.write(resp.raw_response.content)
+
 
     output_links = []
     
@@ -54,34 +65,44 @@ def is_valid(url):
     # There are already some conditions that return False.
     try:
         parsed = urlparse(url)
+
+        if parsed.netloc.endswith('stat.uci.edu') and parsed.path.lower().endswith('/covid19/index.html'):
+            return False
+
         if parsed.scheme not in set(["http", "https"]):
             return False
 
         # Must be in allowed domains or specific path
         netloc_plus_path = parsed.netloc + parsed.path
-        if not (any(domain in parsed.netloc for domain in VALID_DOMAINS) or VALID_PATH in netloc_plus_path):
+        if not any(parsed.netloc == d or parsed.netloc.endswith("." + d)
+                for d in VALID_DOMAINS):
             return False
 
-        fullURL = parsed.netloc + parsed.path + parsed.params + parsed.query + parsed.fragment
+        fullURL = url
         # Avoid calendar dates mm-dd-yyyy
-        match = re.search(r'\b\d{2}-\d{2}-\d{4}\b', fullURL)
-        if match:
+        if re.search(r"\d{2}-\d{2}-\d{4}", fullURL):
             return False
         
         # Avoid calendar dates yyyy-mm
-        matchYearMonth = re.search(r'\d{4}\b-\b\d{2}', fullURL)
-        if matchYearMonth:
+        if re.search(r"\d{4}-\d{2}(?!-\d{2})", fullURL):
             return False
         
         # filter out yyyy-mm-dd + blacklist WICS event pages and dead/useless pages
-        matchYearMonthDayFormat = re.search(r'\d{4}\b-\b\d{2}-\d{2}', fullURL)
-        if matchYearMonthDayFormat:
+        if re.search(r"\d{4}-\d{2}-\d{2}", fullURL):
             return False
+
+        # filter auto‐generated release or home‐directory listings
+        if re.search(r"/~[^/]+/", parsed.path):
+            return False
+
 
         blacklist = ["wics.ics.uci.edu/event", "wics.ics.uci.edu/events", "wiki.ics.uci.edu/doku.php",
         "?ical=1", "action=download", "gitlab.ics.uci.edu", "code.ics.uci.edu",
-        "statistics-stage.ics.uci.edu", "cbcl.ics.uci.edu/doku.php", "isg.ics.uci.edu/events", "isg.ics.uci.edu/event", "grape.ics.uci.edu/wiki",
-        "?action=login", "?action=edit"]
+        "statistics-stage.ics.uci.edu","isg.ics.uci.edu/events", 
+        "cbcl.ics.uci.edu/doku.php", "grape.ics.uci.edu/wiki",
+        "?action=login", "?action=edit", "news.nacs.uci.edu", 
+        "http://www.ics.uci.edu/~eppstein/pix"]
+
         for badLink in blacklist:
             if badLink in fullURL:
                 return False
