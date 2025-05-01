@@ -16,6 +16,7 @@ PAGES_DIR = "pages"
 
 
 def scraper(url, resp):
+    url, _ = urldefrag(url)
     links = extract_next_links(url, resp)
     return [link for link in links if is_valid(link)]
 
@@ -33,11 +34,10 @@ def extract_next_links(url, resp):
     if resp.status == 200:
         os.makedirs(PAGES_DIR, exist_ok=True)
 
-        # build filename from url
         p = urlparse(url)
         fn = (p.netloc + p.path).replace("/", "_").strip("_") + ".html"
 
-        # write the HTML
+        # write raw HTML
         with open(os.path.join(PAGES_DIR, fn), "wb") as f:
             f.write(resp.raw_response.content)
 
@@ -69,7 +69,9 @@ def is_valid(url):
     try:
         parsed = urlparse(url)
 
-        
+        if parsed.netloc == "today.uci.edu" and parsed.path.startswith("/department/information_computer_sciences/"):
+            return True
+
         if parsed.path.lower().endswith('/covid19/index.html'):
             return False
             
@@ -78,7 +80,7 @@ def is_valid(url):
 
         # Must be in allowed domains or specific path
         netloc_plus_path = parsed.netloc + parsed.path
-        if not (parsed.netloc == domain or parsed.netloc.endswith("." + domain)
+        if not any(parsed.netloc == domain or parsed.netloc.endswith("." + domain)
             for domain in VALID_DOMAINS):
             return False
 
@@ -95,11 +97,14 @@ def is_valid(url):
         if re.search(r"\d{4}-\d{2}-\d{2}", fullURL):
             return False
 
+        # filter any personal/home‐directory pages under “~user/…”
+        if re.search(r"/~[^/]+/", parsed.path):
+            return False
 
         blacklist = ["wics.ics.uci.edu/event", "wics.ics.uci.edu/events", "wiki.ics.uci.edu/doku.php",
-        "?ical=1", "action=download", "gitlab.ics.uci.edu", "code.ics.uci.edu",
+        "ical=1", "action=download", "gitlab.ics.uci.edu", "code.ics.uci.edu",
         "statistics-stage.ics.uci.edu", "cbcl.ics.uci.edu/doku.php", "grape.ics.uci.edu/wiki",
-        "?action=login", "?action=edit", "news.nacs.uci.edu", "http://www.ics.uci.edu/~eppstein/pix"]
+        "action=login", "?action=edit", "news.nacs.uci.edu", "http://www.ics.uci.edu/~eppstein/pix"]
         for badLink in blacklist:
             if badLink in fullURL:
                 return False
