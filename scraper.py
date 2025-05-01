@@ -80,7 +80,7 @@ def is_valid(url):
 
         blacklist = ["wics.ics.uci.edu/event", "wics.ics.uci.edu/events", "wiki.ics.uci.edu/doku.php",
         "?ical=1", "action=download", "gitlab.ics.uci.edu", "code.ics.uci.edu",
-        "statistics-stage.ics.uci.edu", "cbcl.ics.uci.edu/doku.php", "grape.ics.uci.edu/wiki",
+        "statistics-stage.ics.uci.edu", "cbcl.ics.uci.edu/doku.php", "isg.ics.uci.edu/events", "isg.ics.uci.edu/event", "grape.ics.uci.edu/wiki",
         "?action=login", "?action=edit"]
         for badLink in blacklist:
             if badLink in fullURL:
