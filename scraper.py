@@ -114,7 +114,6 @@ def is_valid(url):
         ):
             return False
 
-
         blacklist = ["wics.ics.uci.edu/event", "wics.ics.uci.edu/events", "wiki.ics.uci.edu/doku.php",
         "ical=1", "action=download", "gitlab.ics.uci.edu", "code.ics.uci.edu",
         "statistics-stage.ics.uci.edu", "cbcl.ics.uci.edu/doku.php", "grape.ics.uci.edu/wiki",
